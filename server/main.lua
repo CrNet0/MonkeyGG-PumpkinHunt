@@ -101,8 +101,9 @@ end
 
 CreateThread(function()
     updatePumpkinLocations()
+    local updateInterval = 1800000
     while true do
-        Wait(3600000)
+        Wait(updateInterval)
         updatePumpkinLocations()
     end
 end)
@@ -121,7 +122,6 @@ end)
 
 RegisterNetEvent("Pumpkin:Collect")
 AddEventHandler("Pumpkin:Collect", function()
-    -- Validação de variáveis globais
     if not Functions or not Functions["Framework"] or not Functions["Functions"] then
         debugPrint("[PumpkinHunt] Erro: Configuração de Functions ausente.")
         return
@@ -155,7 +155,6 @@ AddEventHandler("Pumpkin:Collect", function()
         return
     end
 
-    -- Limpa cooldowns antigos (mantém apenas os últimos 10 minutos)
     local newCooldowns = {}
     for _, cooldown in ipairs(pumpkinCooldowns) do
         if currentTime - cooldown.timeCollected < COOLDOWN_TIME then
@@ -192,7 +191,7 @@ AddEventHandler("Pumpkin:Collect", function()
                 debugPrint("[PumpkinHunt] Generated prize: " .. prize .. ", valuation: " .. Valuation)
 
                 if (selectedFunctions[2](Passport) + (_G.ItemWeight and _G.ItemWeight(prize) or 0) * Valuation) <= selectedFunctions[3](Passport) then
-                    -- Solicita animação no client
+                    
                     TriggerClientEvent("Pumpkin:PlayCollectAnim", source)
                     selectedFunctions[4](Passport, prize, Valuation, true)
                     table.insert(collectedItems, prize)
