@@ -25,7 +25,7 @@ local prizeRarities = {
     legendary = 2
 }
 
-local COOLDOWN_TIME = 100
+local COOLDOWN_TIME = 600
 
 local function debugPrint(message)
     if Pumpkin["Debug"] then
@@ -34,20 +34,27 @@ local function debugPrint(message)
 end
 
 local function getRandomPrize()
+    if not Pumpkin["Prizes"] or #Pumpkin["Prizes"] == 0 then
+        debugPrint("[PumpkinHunt] Nenhum prêmio configurado.")
+        return nil
+    end
     local totalWeight = 0
     for _, prize in ipairs(Pumpkin["Prizes"]) do
-        totalWeight = totalWeight + prizeRarities[prize.rarity]
+        totalWeight = totalWeight + (prizeRarities[prize.rarity] or 0)
     end
-
+    if totalWeight == 0 then
+        debugPrint("[PumpkinHunt] Peso total dos prêmios é zero.")
+        return Pumpkin["Prizes"][1].name
+    end
     local randomNumber = math.random(1, totalWeight)
     local currentWeight = 0
-
     for _, prize in ipairs(Pumpkin["Prizes"]) do
-        currentWeight = currentWeight + prizeRarities[prize.rarity]
+        currentWeight = currentWeight + (prizeRarities[prize.rarity] or 0)
         if randomNumber <= currentWeight then
             return prize.name
         end
     end
+    return Pumpkin["Prizes"][1].name
 end
 
 local function sendNotification(source, type, message, title)
@@ -185,23 +192,27 @@ AddEventHandler("Pumpkin:Collect", function()
             local totalItemsToCollect = math.random(1, 3)
             local collectedItems = {}
 
+            local currentWeight = selectedFunctions[2](Passport)
+            local maxWeight = selectedFunctions[3](Passport)
+
             for j = 1, totalItemsToCollect do
                 local prize = getRandomPrize()
                 local Valuation = math.random(1, 3)
-                debugPrint("[PumpkinHunt] Generated prize: " .. prize .. ", valuation: " .. Valuation)
+                debugPrint("[PumpkinHunt] Generated prize: " .. tostring(prize) .. ", valuation: " .. tostring(Valuation))
 
-                if (selectedFunctions[2](Passport) + (_G.ItemWeight and _G.ItemWeight(prize) or 0) * Valuation) <= selectedFunctions[3](Passport) then
-                    
+                local prizeWeight = (ItemWeight and ItemWeight(prize) or 0) * Valuation
+                if (currentWeight + prizeWeight) <= maxWeight then
                     TriggerClientEvent("Pumpkin:PlayCollectAnim", source)
                     selectedFunctions[4](Passport, prize, Valuation, true)
                     table.insert(collectedItems, prize)
-                    debugPrint("[PumpkinHunt] Prize " .. prize .. " added to inventory.")
+                    currentWeight = currentWeight + prizeWeight
+                    debugPrint("[PumpkinHunt] Prize " .. tostring(prize) .. " added to inventory.")
                 else
                     sendNotification(source, "amarelo", "Sua recompensa caiu no chão.", "Mochila Sobrecarregada")
                     if exports and exports["inventory"] and exports["inventory"].Drops then
                         exports["inventory"]:Drops(Passport, source, prize, Valuation)
                     end
-                    debugPrint("[PumpkinHunt] Inventory full, prize " .. prize .. " dropped on the ground.")
+                    debugPrint("[PumpkinHunt] Inventory full, prize " .. tostring(prize) .. " dropped on the ground.")
                 end
             end
 
