@@ -16,18 +16,13 @@ local currentPumpkinLocations = {}
 local rarePumpkinEventActive = false
 local rarePumpkinLocations = {}
 
-
-RegisterNetEvent("Pumpkin:PlayCollectAnim")
-AddEventHandler("Pumpkin:PlayCollectAnim", function()
+Citizen.CreateThread(function()
     local animDict = "anim@scripted@player@freemode@tun_prep_ig1_grab_low@heeled@"
-    local animName = "grab_low"
-    local ped = PlayerPedId()
     RequestAnimDict(animDict)
     while not HasAnimDictLoaded(animDict) do
+        RequestAnimDict(animDict)
         Wait(50)
     end
-    TaskPlayAnim(ped, animDict, animName, 8.0, -8.0, -1, 49, 0, false, false, false)
-    Wait(500)
 end)
 
 local function debugPrint(message)

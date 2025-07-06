@@ -50,6 +50,20 @@ local function getRandomPrize()
     end
 end
 
+local function playCollectAnimation(source)
+    local animDict = "anim@scripted@player@freemode@tun_prep_ig1_grab_low@heeled@"
+    local animName = "grab_low"
+
+    RequestAnimDict(animDict)
+    while not HasAnimDictLoaded(animDict) do
+        RequestAnimDict(animDict)
+        Wait(50)
+    end
+
+    TaskPlayAnim(source, animDict, animName, 8.0, -8.0, -1, 49, 0, false, false, false)
+    Wait(500)
+end
+
 local function sendNotification(source, type, message, title)
     TriggerClientEvent("Notify", source, type, message, title, 5000)
 end
@@ -69,7 +83,7 @@ local function updatePumpkinLocations()
         end
     end
     vCLIENT.updatePumpkinLocations(currentPumpkinLocations)
-    debugPrint("[PumpkinHunt] Pumpkin locations updated.")
+    debugPrint("Pumpkin locations updated.")
 end
 
 local function startRarePumpkinEvent()
@@ -89,14 +103,14 @@ local function startRarePumpkinEvent()
         end
     end
     vCLIENT.startRarePumpkinEvent(rarePumpkinLocations)
-    debugPrint("[PumpkinHunt] Rare Pumpkin Event Started!")
+    debugPrint("Rare Pumpkin Event Started!")
 end
 
 local function endRarePumpkinEvent()
     rarePumpkinEventActive = false
     rarePumpkinLocations = {}
     vCLIENT.endRarePumpkinEvent()
-    debugPrint("[PumpkinHunt] Rare Pumpkin Event Ended!")
+    debugPrint("Rare Pumpkin Event Ended!")
 end
 
 CreateThread(function()
@@ -121,103 +135,67 @@ end)
 
 RegisterNetEvent("Pumpkin:Collect")
 AddEventHandler("Pumpkin:Collect", function()
-    -- Validação de variáveis globais
-    if not Functions or not Functions["Framework"] or not Functions["Functions"] then
-        debugPrint("[PumpkinHunt] Erro: Configuração de Functions ausente.")
-        return
-    end
-    if not selectedFunctions then
-        debugPrint("[PumpkinHunt] Erro: selectedFunctions não definido.")
-        return
-    end
-    if not Pumpkin then
-        debugPrint("[PumpkinHunt] Erro: Pumpkin config não carregada.")
-        return
-    end
-
     local source = source
     local Passport = selectedFunctions[1](source)
-    if not Passport then
-        sendNotification(source, "vermelho", "Erro ao obter passaporte.", "Pumpkin Hunt")
-        return
-    end
 
     local currentTime = os.time()
-    local playerPed = GetPlayerPed(source)
-    if not playerPed or not DoesEntityExist(playerPed) then
-        sendNotification(source, "vermelho", "Jogador não encontrado.", "Pumpkin Hunt")
-        return
-    end
-    local playerCoords = GetEntityCoords(playerPed)
+    local playerCoords = GetEntityCoords(GetPlayerPed(source))
     local locations = rarePumpkinEventActive and rarePumpkinLocations or currentPumpkinLocations
-    if not locations or #locations == 0 then
-        sendNotification(source, "vermelho", "Nenhuma abóbora disponível.", "Pumpkin Hunt")
-        return
-    end
-
-    -- Limpa cooldowns antigos (mantém apenas os últimos 10 minutos)
-    local newCooldowns = {}
-    for _, cooldown in ipairs(pumpkinCooldowns) do
-        if currentTime - cooldown.timeCollected < COOLDOWN_TIME then
-            table.insert(newCooldowns, cooldown)
-        end
-    end
-    pumpkinCooldowns = newCooldowns
 
     for i, Coords in ipairs(locations) do
         local pumpkinId = string.format("%.2f,%.2f,%.2f,%s", Coords.x, Coords.y, Coords.z, tostring(Passport))
         local distance = #(playerCoords - vec3(Coords.x, Coords.y, Coords.z))
-        debugPrint("[PumpkinHunt] Checking distance to pumpkin " .. i .. ": " .. distance)
+        debugPrint("Checking distance to pumpkin " .. i .. ": " .. distance)
 
         if distance <= 2.0 then
-            debugPrint("[PumpkinHunt] Distance is within range for pumpkin " .. i)
+            debugPrint("Distance is within range for pumpkin " .. i)
             for _, cooldown in ipairs(pumpkinCooldowns) do
                 if cooldown.playerSource == source and cooldown.pumpkinId == pumpkinId then
                     local timePassed = currentTime - cooldown.timeCollected
                     if timePassed < COOLDOWN_TIME then
                         local remainingTime = COOLDOWN_TIME - timePassed
                         sendNotification(source, "vermelho", "Você já coletou essa abóbora, volte em " .. remainingTime .. " segundos.", "Pumpkin Hunt")
-                        debugPrint("[PumpkinHunt] Cooldown active for pumpkin " .. i .. ", remaining time: " .. remainingTime)
+                        debugPrint("Cooldown active for pumpkin " .. i .. ", remaining time: " .. remainingTime)
                         return
                     end
                 end
             end
 
-            local totalItemsToCollect = math.random(1, 3)
-            local collectedItems = {}
+            if Passport then
+                debugPrint("Passport found for player " .. source)
+                local totalItemsToCollect = math.random(1, 3)
+                local collectedItems = {}
 
-            for j = 1, totalItemsToCollect do
-                local prize = getRandomPrize()
-                local Valuation = math.random(1, 3)
-                debugPrint("[PumpkinHunt] Generated prize: " .. prize .. ", valuation: " .. Valuation)
+                for i = 1, totalItemsToCollect do
+                    local prize = getRandomPrize()
+                    local Valuation = math.random(1, 3)
+                    debugPrint("Generated prize: " .. prize .. ", valuation: " .. Valuation)
 
-                if (selectedFunctions[2](Passport) + (_G.ItemWeight and _G.ItemWeight(prize) or 0) * Valuation) <= selectedFunctions[3](Passport) then
-                    -- Solicita animação no client
-                    TriggerClientEvent("Pumpkin:PlayCollectAnim", source)
-                    selectedFunctions[4](Passport, prize, Valuation, true)
-                    table.insert(collectedItems, prize)
-                    debugPrint("[PumpkinHunt] Prize " .. prize .. " added to inventory.")
-                else
-                    sendNotification(source, "amarelo", "Sua recompensa caiu no chão.", "Mochila Sobrecarregada")
-                    if exports and exports["inventory"] and exports["inventory"].Drops then
+                    if (selectedFunctions[2](Passport) + ItemWeight(prize) * Valuation) <= selectedFunctions[3](Passport) then
+                        playCollectAnimation(source)
+                        selectedFunctions[4](Passport, prize, Valuation, true)
+                        table.insert(collectedItems, prize)
+                        debugPrint("Prize " .. prize .. " added to inventory.")
+                    else
+                        sendNotification(source, "amarelo", "Sua recompensa caiu no chão.", "Mochila Sobrecarregada")
                         exports["inventory"]:Drops(Passport, source, prize, Valuation)
+                        debugPrint("Inventory full, prize " .. prize .. " dropped on the ground.")
                     end
-                    debugPrint("[PumpkinHunt] Inventory full, prize " .. prize .. " dropped on the ground.")
                 end
+
+                table.insert(pumpkinCooldowns, { playerSource = source, pumpkinId = pumpkinId, timeCollected = currentTime })
+                debugPrint("Cooldown added for pumpkin " .. i)
+
+                if #collectedItems > 0 then
+                    sendNotification(source, "azul", "Você coletou: " .. table.concat(collectedItems, ", ") .. " na Pumpkin Hunt.", "Pumpkin Hunt")
+                    debugPrint("Collected items: " .. table.concat(collectedItems, ", "))
+                end
+
+                return
             end
-
-            table.insert(pumpkinCooldowns, { playerSource = source, pumpkinId = pumpkinId, timeCollected = currentTime })
-            debugPrint("[PumpkinHunt] Cooldown added for pumpkin " .. i)
-
-            if #collectedItems > 0 then
-                sendNotification(source, "azul", "Você coletou: " .. table.concat(collectedItems, ", ") .. " na Pumpkin Hunt.", "Pumpkin Hunt")
-                debugPrint("[PumpkinHunt] Collected items: " .. table.concat(collectedItems, ", "))
-            end
-
-            return
         end
     end
 
     sendNotification(source, "vermelho", "Você precisa estar mais perto de uma abóbora.", "Pumpkin Hunt")
-    debugPrint("[PumpkinHunt] Player is not close enough to any pumpkin.")
+    debugPrint("Player is not close enough to any pumpkin.")
 end)
